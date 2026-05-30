@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # BuildersHub 🚀
 
 > **Where builders ship in public.**
@@ -178,3 +179,7 @@ buildershub/
 ## 📄 License
 
 MIT
+=======
+# BuildersHub
+A community platform where developers share, launch, and grow their side projects — Reddit + ProductHunt + Twitter for builders.
+>>>>>>> 3b3c82ccacd3411ecbacf76c9a9b206c8122f09c
