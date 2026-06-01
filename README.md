@@ -169,7 +169,7 @@ buildershub/
 
 | Service | Platform |
 |---------|----------|
-| Frontend | Vercel |
+| Frontend | Netlify |
 | Backend | Render / Railway |
 | Database | MongoDB Atlas |
 | Media | Cloudinary CDN |
