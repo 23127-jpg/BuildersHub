@@ -34,7 +34,6 @@ const generateDescription = async (req, res) => {
       return res.status(400).json({ message: 'Each bullet point must not exceed 200 characters.' })
 
     const prompt = `Write a compelling project description (100-500 words) for a developer side project based on these bullet points:\n${bulletPoints.map((b) => `- ${b}`).join('\n')}\n\nReturn only the description text, no extra commentary.`
-
     const description = await withTimeout(callGemini(prompt))
     res.json({ description })
   } catch (err) {

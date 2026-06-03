@@ -62,14 +62,17 @@ export default function SubmitProjectPage() {
   }
 
   const generateDescription = async () => {
-    const points = bulletPoints.split('\n').map((b) => b.trim()).filter(Boolean)
-    if (!points.length) return
+    if (!bulletPoints.trim()) return
     setAiLoading(true)
+    setServerError('')
     try {
+      // Accept both plain text and bullet points — split by newlines or treat as single point
+      const lines = bulletPoints.split('\n').map((b) => b.replace(/^[-*•]\s*/, '').trim()).filter(Boolean)
+      const points = lines.length > 0 ? lines : [bulletPoints.trim()]
       const { data } = await axiosInstance.post('/ai/generate-description', { bulletPoints: points })
       setForm((f) => ({ ...f, description: data.description }))
     } catch (err) {
-      setServerError(err.response?.data?.message || 'AI service unavailable.')
+      setServerError(err.response?.data?.message || 'AI service unavailable. Check GEMINI_API_KEY in Render.')
     } finally {
       setAiLoading(false)
     }
@@ -125,7 +128,7 @@ export default function SubmitProjectPage() {
             {/* AI description generator */}
             <div style={{ marginTop: '0.75rem', padding: '0.875rem', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '8px' }}>
               <p style={{ color: 'var(--accent)', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem' }}>✨ Generate with Gemini AI</p>
-              <textarea value={bulletPoints} onChange={(e) => setBulletPoints(e.target.value)} placeholder="Enter bullet points (one per line)&#10;- Helps developers manage prompts&#10;- Version control for AI prompts&#10;- Team collaboration features" rows={4} style={{ ...inputStyle, resize: 'vertical', fontSize: '0.85rem' }} />
+              <textarea value={bulletPoints} onChange={(e) => setBulletPoints(e.target.value)} placeholder="Describe your project in a few words or bullet points&#10;e.g. blood donation management system that connects donors with hospitals" rows={4} style={{ ...inputStyle, resize: 'vertical', fontSize: '0.85rem' }} />
               <button type="button" onClick={generateDescription} disabled={aiLoading || !bulletPoints.trim()} style={{ marginTop: '0.5rem', padding: '6px 16px', background: 'var(--accent)', borderRadius: '9999px', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '0.85rem', opacity: aiLoading || !bulletPoints.trim() ? 0.6 : 1 }}>
                 {aiLoading ? 'Generating…' : '✨ Generate description'}
               </button>
