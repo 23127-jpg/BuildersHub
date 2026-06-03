@@ -2,8 +2,10 @@ import axios from 'axios'
 import store from '../store'
 import { setCredentials, clearCredentials } from '../store/authSlice'
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: BASE_URL,
   withCredentials: true,
 })
 
@@ -57,22 +59,16 @@ axiosInstance.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/refresh`,
-          { refreshToken }
-        )
-
+        const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken })
         const { accessToken } = data
         const { user } = store.getState().auth
         store.dispatch(setCredentials({ user, accessToken }))
-
         processQueue(null, accessToken)
         originalRequest.headers.Authorization = `Bearer ${accessToken}`
         return axiosInstance(originalRequest)
       } catch (refreshError) {
         processQueue(refreshError, null)
         store.dispatch(clearCredentials())
-        localStorage.removeItem('refreshToken')
         window.location.href = '/login'
         return Promise.reject(refreshError)
       } finally {
@@ -83,5 +79,26 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+/**
+ * Call this once on app startup to restore the access token.
+ * If refreshToken exists in localStorage, exchange it for a fresh accessToken.
+ */
+export const restoreSession = async () => {
+  const refreshToken = localStorage.getItem('refreshToken')
+  const savedUser = (() => {
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
+  })()
+
+  if (!refreshToken || !savedUser) return
+
+  try {
+    const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken })
+    store.dispatch(setCredentials({ user: savedUser, accessToken: data.accessToken }))
+  } catch {
+    // Refresh token expired — clear everything
+    store.dispatch(clearCredentials())
+  }
+}
 
 export default axiosInstance

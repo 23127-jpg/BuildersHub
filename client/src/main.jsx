@@ -5,6 +5,7 @@ import { Provider } from 'react-redux'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import store from './store'
 import App from './App'
+import { restoreSession } from './services/axiosInstance'
 import './index.css'
 
 // Apply saved theme before first render to prevent flash of unstyled content
@@ -22,14 +23,18 @@ const queryClient = new QueryClient({
   },
 })
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </QueryClientProvider>
-    </Provider>
-  </React.StrictMode>
-)
+// Restore session from localStorage before first render
+// This silently exchanges the stored refreshToken for a new accessToken
+restoreSession().finally(() => {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </Provider>
+    </React.StrictMode>
+  )
+})
