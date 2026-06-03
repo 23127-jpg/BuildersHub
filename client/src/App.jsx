@@ -1,9 +1,10 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { io } from 'socket.io-client'
 import { addNotification, setUnreadCount } from './store/notificationSlice'
 import { setUnreadDMCount } from './store/dmSlice'
+import { restoreSession } from './services/axiosInstance'
 
 // Pages
 import LandingPage from './pages/LandingPage'
@@ -29,8 +30,18 @@ import EmbedCardPage from './pages/EmbedCardPage'
 // Shared
 import Navbar from './components/Navbar'
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, sessionReady }) {
   const isAuthenticated = useSelector((s) => s.auth.isAuthenticated)
+
+  // Wait for session restore before making auth decision
+  if (!sessionReady) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading…</div>
+      </div>
+    )
+  }
+
   return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 
@@ -63,6 +74,14 @@ function SocketManager() {
 }
 
 export default function App() {
+  const [sessionReady, setSessionReady] = useState(false)
+
+  useEffect(() => {
+    restoreSession().finally(() => setSessionReady(true))
+  }, [])
+
+  const pr = (children) => <ProtectedRoute sessionReady={sessionReady}>{children}</ProtectedRoute>
+
   return (
     <>
       <SocketManager />
@@ -81,15 +100,15 @@ export default function App() {
         <Route path="/explore" element={<ExplorePage />} />
 
         {/* ── Protected ──────────────────────────────────────── */}
-        <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
-        <Route path="/submit" element={<ProtectedRoute><SubmitProjectPage /></ProtectedRoute>} />
-        <Route path="/discuss" element={<ProtectedRoute><DiscussionsPage /></ProtectedRoute>} />
-        <Route path="/profile/:username" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-        <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
-        <Route path="/messages" element={<ProtectedRoute><DMPage /></ProtectedRoute>} />
-        <Route path="/collections" element={<ProtectedRoute><CollectionsPage /></ProtectedRoute>} />
+        <Route path="/feed" element={pr(<FeedPage />)} />
+        <Route path="/submit" element={pr(<SubmitProjectPage />)} />
+        <Route path="/discuss" element={pr(<DiscussionsPage />)} />
+        <Route path="/profile/:username" element={pr(<ProfilePage />)} />
+        <Route path="/notifications" element={pr(<NotificationsPage />)} />
+        <Route path="/settings" element={pr(<SettingsPage />)} />
+        <Route path="/bookmarks" element={pr(<BookmarksPage />)} />
+        <Route path="/messages" element={pr(<DMPage />)} />
+        <Route path="/collections" element={pr(<CollectionsPage />)} />
 
         {/* ── Fallback ───────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
