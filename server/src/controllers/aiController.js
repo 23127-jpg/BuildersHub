@@ -10,14 +10,32 @@ const withTimeout = (promise) =>
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS)),
   ])
 
-/**
- * Helper — calls Gemini and returns the text response.
- * Uses gemini-1.5-flash (fast, free-tier friendly).
- */
+// Try multiple model names in order of preference
+const MODELS = [
+  'gemini-2.0-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-flash',
+  'gemini-pro',
+]
+
 const callGemini = async (prompt) => {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
-  const result = await model.generateContent(prompt)
-  return result.response.text()
+  let lastError = null
+  for (const modelName of MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName })
+      const result = await withTimeout(model.generateContent(prompt))
+      return result.response.text()
+    } catch (err) {
+      lastError = err
+      // If model not found, try next one
+      if (err.message && (err.message.includes('404') || err.message.includes('not found'))) {
+        continue
+      }
+      // For other errors (auth, quota, etc.), throw immediately
+      throw err
+    }
+  }
+  throw lastError
 }
 
 /** POST /api/ai/generate-description */
@@ -29,18 +47,14 @@ const generateDescription = async (req, res) => {
       return res.status(400).json({ message: 'At least one bullet point is required.' })
     if (bulletPoints.length > 20)
       return res.status(400).json({ message: 'Maximum 20 bullet points allowed.' })
-    const tooLong = bulletPoints.find((b) => b.length > 200)
-    if (tooLong)
-      return res.status(400).json({ message: 'Each bullet point must not exceed 200 characters.' })
 
     const prompt = `Write a compelling project description (100-500 words) for a developer side project based on these bullet points:\n${bulletPoints.map((b) => `- ${b}`).join('\n')}\n\nReturn only the description text, no extra commentary.`
-    const description = await withTimeout(callGemini(prompt))
+
+    const description = await callGemini(prompt)
     res.json({ description })
   } catch (err) {
     console.error('AI generateDescription error:', err.message)
-    if (err.message === 'timeout' || (err.status && err.status >= 500))
-      return res.status(503).json({ message: 'AI service temporarily unavailable.' })
-    res.status(500).json({ message: 'Internal Server Error' })
+    res.status(503).json({ message: 'AI service temporarily unavailable. Please try again later.' })
   }
 }
 
@@ -56,17 +70,14 @@ const suggestTags = async (req, res) => {
 
     const prompt = `Given this project title: "${title}" and description: "${description}", suggest 1-3 tags from this list only: ${VALID_TAGS.join(', ')}. Return ONLY a valid JSON array of tag strings, e.g. ["AI","SaaS"]. No explanation, no markdown, just the JSON array.`
 
-    const raw = await withTimeout(callGemini(prompt))
-
-    // Strip any markdown code fences Gemini might add
+    const raw = await callGemini(prompt)
     const cleaned = raw.replace(/```json?/gi, '').replace(/```/g, '').trim()
 
     let suggested = []
     try {
       suggested = JSON.parse(cleaned)
     } catch {
-      // Try to extract array from the response if JSON parse fails
-      const match = cleaned.match(/\[.*?\]/)
+      const match = cleaned.match(/\[.*?\]/s)
       if (match) {
         try { suggested = JSON.parse(match[0]) } catch { suggested = [] }
       }
@@ -79,9 +90,7 @@ const suggestTags = async (req, res) => {
     res.json({ tags: valid })
   } catch (err) {
     console.error('AI suggestTags error:', err.message)
-    if (err.message === 'timeout' || (err.status && err.status >= 500))
-      return res.status(503).json({ message: 'AI service temporarily unavailable.' })
-    res.status(500).json({ message: 'Internal Server Error' })
+    res.status(503).json({ message: 'AI service temporarily unavailable. Please try again later.' })
   }
 }
 
